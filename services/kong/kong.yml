@@ -1,0 +1,30 @@
+_format_version: "2.1"
+_transform: true
+
+services:
+  ######################
+  #### Test API  ####
+  - name: test_api_otel
+    connect_timeout: 120000
+    read_timeout: 120000
+    write_timeout: 120000
+    retries: 1
+#    url: http://host.docker.internal:8042
+    url: http://test_api:80
+    routes:
+      - name: test_api_route
+        paths:
+          - /test_api
+        strip_path: true
+
+consumers:
+  - username: "anonymous"
+    id: "3e82168d-71a4-4cd7-a159-172671ae4cb3"
+
+plugins:
+  - name: elastic-apm
+    enabled: true
+    service: test_api_otel
+    config:
+      apm_active: true
+      apm_server_url: http://apm_server:8200

@@ -1,0 +1,9 @@
+venv/
+.venv/
+logs/
+.idea/
+.env.*
+**/*.pyc
+logstash.db
+.pytest_cache/
+Dockerfile

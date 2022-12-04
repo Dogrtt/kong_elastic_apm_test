@@ -1,0 +1,20 @@
+## Cluster settings
+## see https://github.com/elastic/elasticsearch/blob/master/distribution/docker/src/docker/config/elasticsearch.yml
+#
+cluster.name: "docker-cluster"
+network.host: "0.0.0.0"
+http.host: 0.0.0.0
+
+
+## X-Pack settings
+## see https://www.elastic.co/guide/en/elasticsearch/reference/current/setup-xpack.html
+
+# License
+xpack.license.self_generated.type: basic
+
+# Security
+#xpack.security.enabled: false
+#xpack.security.enabled: true
+#xpack.monitoring.collection.enabled: true
+#xpack.security.authc.token.enabled: true
+#xpack.security.authc.api_key.enabled: true

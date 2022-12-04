@@ -1,0 +1,142 @@
+networks:
+  test_otel_net:
+    driver: bridge
+
+volumes:
+  elasticsearch:
+
+services:
+  # ###########################
+  # #### ELK Elasticsearch ####
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.7
+    container_name: elastic_otel
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "50"
+    hostname: elasticsearch
+    volumes:
+      - type: bind
+        source: ./services/elk/elasticsearch/elasticsearch.yml
+        target: /usr/share/elasticsearch/config/elasticsearch.yml
+        read_only: true
+      - type: volume
+        source: elasticsearch
+        target: /usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      ES_JAVA_OPTS: -Xmx256m -Xms256m
+      bootstrap.memory_lock: "true"
+      discovery.type: single-node
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 200000
+        hard: 200000
+    networks:
+      - test_otel_net
+
+  # ####################
+  # #### ELK Kibana ####
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.7
+    container_name: kibana_otel
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "50"
+    hostname: kibana
+    volumes:
+      - type: bind
+        source: ./services/elk/kibana/kibana.yml
+        target: /usr/share/kibana/config/kibana.yml
+        read_only: true
+    ports:
+      - "5601:5601"
+    networks:
+      - test_otel_net
+    depends_on:
+      - elasticsearch
+
+  # ########################
+  # #### ELK APM SERVER ####
+  apm_server:
+    image: docker.elastic.co/apm/apm-server:7.17.7
+    container_name: apm_server_otel
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "50"
+    hostname: apm_server
+    command:
+      - --strict.perms=false
+    volumes:
+      - type: bind
+        source: ./services/elk/apm_server/apm-server.yml
+        target: /usr/share/apm-server/apm-server.yml
+        read_only: true
+    ports:
+      - "8200:8200"
+    networks:
+      - test_otel_net
+    depends_on:
+      - elasticsearch
+
+  # ##########################
+  # #### Fast API Service ####
+  test_api:
+    image: test_api_otel:latest
+    build:
+      context: ./services/test_api
+    container_name: test_api_otel
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "50"
+    hostname: test_api
+    environment:
+      - ROOT_PATH=/test_api
+      - SERVICE_NAME="Test API 1"
+      - APM_ENABLED=True
+      - APM_SERVER_HOST=apm_server
+      - APM_SERVER_PORT=8200
+      - PYTHONUNBUFFERED=1
+    networks:
+      - test_otel_net
+    depends_on:
+      - apm_server
+
+  # ##############
+  # #### KONG ####
+  kong:
+    image: kong_otel_proxy:latest
+    build:
+      context: ./services/kong
+    container_name: kong_otel
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "50"
+    environment:
+      - KONG_DATABASE=off
+      - ANONYMOUS_REPORTS=off
+      - KONG_DECLARATIVE_CONFIG=/etc/kong/kong.otel.yml
+      - KONG_PLUGINS=bundled,elastic-apm
+      - KONG_PLUGINSERVER_NAMES=elastic-apm
+      - KONG_PLUGINSERVER_ELASTIC_APM_QUERY_CMD=/usr/local/bin/elastic-apm -dump
+    networks:
+      - test_otel_net
+    ports:
+      - "8000:8000"
+    depends_on:
+      - test_api
